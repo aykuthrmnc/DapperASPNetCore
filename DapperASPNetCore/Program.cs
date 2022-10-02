@@ -49,6 +49,7 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddSingleton<DapperContext>();
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 //builder.Services.AddDbContext<DapperContext>();
 
 builder.Services.AddCors(options =>

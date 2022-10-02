@@ -1,5 +1,5 @@
-﻿using Dapper;
-using DapperASPNetCore.Context;
+﻿using DapperASPNetCore.Contracts;
+//using DapperASPNetCore.Context;
 using DapperASPNetCore.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -13,9 +13,15 @@ namespace DapperASPNetCore.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly DapperContext _context;
+        //private readonly DapperContext _context;
 
-        public AuthController(DapperContext context) => _context = context;
+        //public AuthController(DapperContext context) => _context = context;
+        private readonly IAuthRepository _authRepo;
+
+        public AuthController(IAuthRepository authRepo)
+        {
+            _authRepo = authRepo;
+        }
 
         [HttpPost, Route("login")]
         public async Task<IActionResult> Login([FromBody] LoginModel user)
@@ -24,37 +30,31 @@ namespace DapperASPNetCore.Controllers
             {
                 return BadRequest("Geçersiz sunucu isteği");
             }
-            var query = "SELECT * FROM Users where UserName = @UserName and Password = @Password";
-            //var parameters = new DynamicParameters();
-            //parameters.Add("UserName", user.UserName);
-            //parameters.Add("Password", user.Password);
-            using (var connection = _context.CreateConnection())
-            {
-                var dbUser = await connection.QuerySingleOrDefaultAsync<LoginModel>(query, user);
-                if (user.UserName == dbUser.UserName && user.Password == dbUser.Password)
-                {
-                    var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("superSecretKey@345"));
-                    var signingCredentials = new SigningCredentials(secretKey, SecurityAlgorithms.HmacSha256);
 
-                    var claims = new List<Claim>
+            var dbUser = await _authRepo.GetUser(user);
+            if (user.UserName == dbUser?.UserName && user.Password == dbUser?.Password)
+            {
+                var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("superSecretKey@345"));
+                var signingCredentials = new SigningCredentials(secretKey, SecurityAlgorithms.HmacSha256);
+
+                var claims = new List<Claim>
                     {
                         new Claim("UserName", user.UserName),
                         new Claim("Password", user.Password),
                         //new Claim(ClaimTypes.Role, "Manager"),
                     };
 
-                    var tokenOptions = new JwtSecurityToken(
-                        issuer: "https://localhost:44336",
-                        audience: "https://localhost:44336",
-                        //claims: new List<Claim>(),
-                        claims: claims,
-                        expires: DateTime.Now.AddMinutes(5),
-                        signingCredentials: signingCredentials
-                    );
+                var tokenOptions = new JwtSecurityToken(
+                    issuer: "https://localhost:44336",
+                    audience: "https://localhost:44336",
+                    //claims: new List<Claim>(),
+                    claims: claims,
+                    expires: DateTime.Now.AddMinutes(5),
+                    signingCredentials: signingCredentials
+                );
 
-                    var tokenString = new JwtSecurityTokenHandler().WriteToken(tokenOptions);
-                    return Ok(new { Token = tokenString });
-                }
+                var tokenString = new JwtSecurityTokenHandler().WriteToken(tokenOptions);
+                return Ok(new { Token = tokenString });
             }
             return Unauthorized();
         }
